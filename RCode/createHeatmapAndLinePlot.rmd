@@ -1,0 +1,250 @@
+---
+title: "new_heatmap"
+output: html_document
+date: "2022-11-11"
+---
+
+
+```{r}
+#install.packages("tidyverse")
+#install.packages("rlang", type = "source")
+#install.packages("scales")
+#install.packages("vctrs")
+
+#if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+#BiocManager::install("ComplexHeatmap")
+
+library(vctrs)
+library(dplyr)
+library(rlang)
+library(fastcluster)
+library(ComplexHeatmap)
+library(circlize)
+library(tidyverse)
+```
+
+
+
+```{r}
+getwd()
+
+```
+
+
+```{r}
+all_TPM <- read_csv("all_rawCount.csv")
+all_TPM
+```
+
+
+```{r}
+all_TPM <- all_TPM %>%select('Gene ID',BCC56535_G3F,BCC56535_G3H,BCC56535_G6M,BCC56535_G6N,BCC56535_S3K,BCC56535_S3L,BCC56535_S6T,BCC56535_S6U,BCC199_G3F,BCC199_G3H,BCC199_G6M,BCC199_G6N,BCC199_S3K,BCC199_S3L,BCC199_S6T,BCC199_S6U,HUT2365_G3F,HUT2365_G3H,HUT2365_G6M,HUT2365_G6N,HUT2365_S3K,HUT2365_S3L,HUT2365_S6T,HUT2365_S6U)
+
+all_TPM
+```
+
+
+```{r}
+filter_TPM <- all_TPM %>% drop_na()
+filter_TPM %>% nrow()
+
+filter_TPM
+```
+```{r}
+filter_TPM_1 <- filter_TPM %>% filter_at(vars(-'Gene ID') ,any_vars(.>10))
+filter_TPM_1%>%nrow
+```
+```{r}
+filter_TPM_1 <- filter_TPM_1 %>% column_to_rownames(., var="Gene ID")
+filter_TPM_2 = filter_TPM_1 +1
+log_filter_2 <- log2(filter_TPM_2)
+log_filter_2
+```
+```{r}
+# creating function for calculate z-score
+filter_z_score <-t(apply((log_filter_2), 1, function(x){
+  mean <- mean(x)
+  SD <- sd(x)
+  Z_score <- (x-mean)/SD
+  Z_score
+}))
+
+head(filter_z_score)
+```
+
+```{r}
+filter_hclust<-filter_z_score%>%hclust.vector(method="ward")
+filter_order<-filter_z_score[filter_hclust$order,]%>%cbind.data.frame(idx=seq(1:nrow(.)))
+```
+
+```{r}
+# HM_all <-  Heatmap(filter_order%>%select(-idx),cluster_rows = FALSE, cluster_columns = F,clustering_method_columns = "ward.D2" ,col = colorRamp2(c(-2,0,2),c("#000099","black","#FFF601")), show_row_names = F, name = "z-score", border = TRUE,width = unit(20, "cm"), height = unit(35, "cm"), column_title = "TPM z-score normalization",column_title_gp = gpar(fontsize = 15, fontface = "bold"), column_title_side = "bottom", column_names_rot = 90,column_names_gp = gpar(fontsize = 9), row_gap = unit(2, "mm"))
+# draw(HM_all)
+```
+
+```{r}
+HM_all <-  Heatmap(filter_order%>%select(-idx),
+                   name = "Z-score",
+                   col = colorRamp2(c(-2,0,2),c("#084594","black","#fbff00")),
+                   show_row_names = FALSE,
+                   show_column_names = TRUE,
+                   cluster_rows = FALSE,
+                   cluster_columns = FALSE,
+                   clustering_method_columns = "ward.D2",
+                   border = TRUE,
+                   width = unit(15, "cm"),
+                   height = unit(35, "cm"),
+                   column_title_gp = gpar(fontsize = 6, fontface = "bold"),
+                   column_title_side = "bottom", column_names_rot = 90,
+                   row_gap = unit(2, "mm"),
+                   show_column_dend = TRUE,
+                   show_row_dend = TRUE,
+                   row_dend_reorder = TRUE,
+                   column_dend_reorder = TRUE,
+                   )
+
+
+```
+```{r}
+draw(HM_all)
+```
+
+
+
+```{r}
+ggplot(filter_hclust$height %>% as.tibble() %>% add_column(groups = length(filter_hclust$height):1) , aes(x=groups, y=value)) +geom_point() + geom_line() + xlim(0,20)
+```
+
+```{r}
+row_cutree <- data.frame(cutree(filter_hclust, k = 7 ))
+colnames(row_cutree) <- "cluster"
+alldata_z_score_cluster <- as.data.frame(filter_z_score) %>% rownames_to_column() %>% right_join(row_cutree %>% rownames_to_column()) %>% column_to_rownames()
+alldata_z_score_cluster
+```
+
+```{r}
+alldata_z_or_cluster <- alldata_z_score_cluster[filter_hclust$order,] %>% cbind.data.frame(index=seq(1:nrow(.)))
+```
+
+
+
+
+```{r}
+#library(hashmap)
+# reorder of cluster
+#order_cluster <-unique(alldata_z_or_cluster$cluster) %>% as.character()
+#k <- hashmap(order_cluster, 1:length(order_cluster))
+#alldata_z_or_cluster$n_cluster <- k[[alldata_z_or_cluster$cluster]]
+#alldata_z_or_cluster
+```
+
+
+```{r}
+#alldata_z_or_cluster <- alldata_z_or_cluster[order(alldata_z_or_cluster$cluster),]
+```
+
+
+```{r}
+alldata_z_or_cluster$NewClust <- sapply(alldata_z_or_cluster$cluster, function(x) {
+  y <- as.numeric(x)
+  y[y == 4] <- "1A"
+  y[y == 7] <- "2A"
+  y[y == 2] <- "3A"
+  y[y == 6] <- "4A"
+  y[y == 1] <- "5A"
+  y[y == 5] <- "6A"
+  y[y == 3] <- "7A"
+  z <- gsub("A","",y)
+  return(as.numeric(z))
+  })
+  
+```
+
+
+
+```{r}
+
+HM_cluster <- draw(HM_all, row_split=alldata_z_or_cluster$NewClust)
+
+```
+
+```{r}
+png('all_NornRead_7cluster_Nov2022.png', width = 2000, height = 2500, units = "px" )
+HM_cluster <- draw(HM_all, row_split=alldata_z_or_cluster$NewClust)
+dev.off()
+```
+
+
+
+```{r}
+all_line_r1 <- alldata_z_or_cluster %>% rownames_to_column() %>% mutate_if(is.numeric,replace_na,replace=0) %>% select(c(2:25,28)) %>% gather(.,key=line, value="expr", -NewClust)%>%separate(col = line, into = c("line","Rep"), sep = "_")
+
+all_line_r1
+```
+```{r}
+library(stringr)
+```
+
+```{r}
+all_line_avg_r1 <-all_line_r1%>% group_by(line,Rep,NewClust) %>% summarise(avg=mean(expr), sd=sd(expr)) 
+all_line_avg_r1$line <- as.factor(all_line_avg_r1$line) 
+all_line_avg_r1$line <- factor(all_line_avg_r1$line, levels=c("BCC56535", "BCC199", "HUT2365"))
+all_line_avg_r1
+```
+
+```{r}
+library(gridExtra)
+color_spec <- c("#4DBBD5B2","#F39B7FB2","#DC0000B2")
+p <- list()
+```
+
+```{r}
+library(ggpubr)
+```
+
+```{r}
+for (i in c(1:7)) {
+    p[[i]] <- ggplot(filter(all_line_avg_r1, NewClust==i),aes(x=Rep, y=avg, group=interaction(line))) +
+        geom_line(aes(color=interaction(line)), size = 1) +
+        geom_ribbon(aes(ymin=avg-sd, ymax=avg+sd,fill=interaction(line)),
+                    alpha = 0.15) + theme_minimal() + labs(title = paste("Cluster",i), x="Replicate", y="Avg z-score value",color="Strains", fill="Strains") + facet_grid(~line)+
+                                            scale_fill_manual(values=color_spec) +
+                                            scale_color_manual(values = color_spec)+
+                                            theme(
+                                                plot.title = element_text( size=14),
+                                                axis.title.x = element_text( size=14, face="bold"),
+                                                axis.title.y = element_text( size=14),
+                                                axis.text  = element_text( size=12),
+                                                strip.text.x  = element_text( size=12, face = "italic")
+                                            )
+}
+ggarrange(plotlist=p, ncol = 1, nrow = 7)
+```
+
+
+
+```{r}
+for (i in c(1:7)) {
+    p[[i]] <- ggplot(filter(all_line_avg_r1, NewClust==i),aes(x=Rep, y=avg, group=interaction(line))) +
+        geom_line(aes(color=interaction(line)), size = 1) +
+        geom_ribbon(aes(ymin=avg-sd, ymax=avg+sd,fill=interaction(line)),
+                    alpha = 0.15) + theme_minimal() + facet_grid(~line)+
+                                            scale_fill_manual(values=color_spec) +
+                                            scale_color_manual(values = color_spec
+                                           
+                                            )
+}
+ggarrange(plotlist=p, ncol = 1, nrow = 7)
+```
+
+
+```{r}
+png('line_plot_all_Nov2022.png', width = 500, height = 1000, units = "px" )
+ggarrange(plotlist=p, ncol = 1, nrow = 7)
+dev.off()
+```
+
+
+
