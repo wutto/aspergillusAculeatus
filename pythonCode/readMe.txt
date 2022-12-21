@@ -19,7 +19,7 @@ All code was written in Python (as a Python notebook)
 2_featureSelectionRegression_Xylanase_GluWS.ipynb ==> Feature Selection and Multiple linear Regression for enzyme Xylanase using data from both Glucose and WS
 2_featureSelectionRegression_Xylanase_WS.ipynb ==> Feature Selection and Multiple linear Regression for enzyme Xylanase using data from WS
 
-##Part
+##Part3
 ##Additional analysis
 additional_drawKeggPathway.ipynb ==> A code for drawing KEGG pathway from BLASTKOALA output
 additional_goEnrichmentFisher.ipynb ==> A code for GO (gene ontology) enrichment based on Fisher's exact test
